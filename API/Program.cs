@@ -7,12 +7,28 @@ using System.Text.Json;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpClient();
 
+// Add a named CORS policy to allow the Angular dev server
+var angularOrigin = "http://localhost:4200";
+var corsPolicyName = "AllowAngularDev";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(corsPolicyName, policy =>
+    {
+        policy.WithOrigins(angularOrigin)
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 // Capture IConfiguration so it can be used like a readonly field in this file
 var _configuration = builder.Configuration;
 
 var app = builder.Build();
 
-app.MapPost("/ask", async (HuggingFaceRequest request, IHttpClientFactory factory) =>
+// Enable CORS before mapping endpoints
+app.UseCors(corsPolicyName);
+
+app.MapPost("api/ask", async (HuggingFaceRequest request, IHttpClientFactory factory) =>
 {
     if (string.IsNullOrWhiteSpace(request.Model) || string.IsNullOrWhiteSpace(request.Prompt))
         return Results.BadRequest(new { error = "Both 'model' and 'prompt' are required." });

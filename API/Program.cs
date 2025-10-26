@@ -1,23 +1,45 @@
+using API.models.HuggingFaceApiDemo.Models;
+using API.models;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddHttpClient();
 
-// Add services to the container.
-
-builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// Capture IConfiguration so it can be used like a readonly field in this file
+var _configuration = builder.Configuration;
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+app.MapPost("/ask", async (HuggingFaceRequest request, IHttpClientFactory factory) =>
 {
-    app.MapOpenApi();
-}
+    if (string.IsNullOrWhiteSpace(request.Model) || string.IsNullOrWhiteSpace(request.Prompt))
+        return Results.BadRequest(new { error = "Both 'model' and 'prompt' are required." });
 
-app.UseHttpsRedirection();
+    // Prefer configuration value, fall back to environment variable
+    var hfToken = _configuration["HF_TOKEN"] ?? Environment.GetEnvironmentVariable("HF_TOKEN");
+    if (string.IsNullOrWhiteSpace(hfToken))
+        return Results.Problem("Missing HF_TOKEN configuration or environment variable", statusCode: 500);
 
-app.UseAuthorization();
+    var http = factory.CreateClient();
+    http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", hfToken);
 
-app.MapControllers();
+    var body = new
+    {
+        model = request.Model,
+        prompt = request.Prompt
+    };
+
+    var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+
+    var response = await http.PostAsync("https://router.huggingface.co/featherless-ai/v1/completions", content);
+    var json = await response.Content.ReadAsStringAsync();
+
+    if (!response.IsSuccessStatusCode)
+        return Results.Problem($"Hugging Face API error: {response.StatusCode}\n{json}", statusCode: (int)response.StatusCode);
+
+    return Results.Content(json, "application/json");
+});
 
 app.Run();

@@ -30,8 +30,8 @@ app.UseCors(corsPolicyName);
 
 app.MapPost("api/ask", async (HuggingFaceRequest request, IHttpClientFactory factory) =>
 {
-    if (string.IsNullOrWhiteSpace(request.Model) || string.IsNullOrWhiteSpace(request.Prompt))
-        return Results.BadRequest(new { error = "Both 'model' and 'prompt' are required." });
+    //if (string.IsNullOrWhiteSpace(request.Model) || string.IsNullOrWhiteSpace(request.Prompt))
+    //    return Results.BadRequest(new { error = "Both 'model' and 'prompt' are required." });
 
     // Prefer configuration value, fall back to environment variable
     var hfToken = _configuration["HF_TOKEN"] ?? Environment.GetEnvironmentVariable("HF_TOKEN");
@@ -41,15 +41,28 @@ app.MapPost("api/ask", async (HuggingFaceRequest request, IHttpClientFactory fac
     var http = factory.CreateClient();
     http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", hfToken);
 
-    var body = new
+    //var body = new
+    //{
+    //    model = request.Model,
+    //    prompt = request.Prompt
+    //};
+       var body = new ChatRequest
     {
-        model = request.Model,
-        prompt = request.Prompt
+        Model = "openai/gpt-oss-20b:groq",
+        Stream = false,
+        Messages = new List<ChatMessage>
+            {
+                new ChatMessage { Role = "user", Content = request.Prompt }
+            }
     };
+    var jsonbody = JsonSerializer.Serialize(body, new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    });
 
-    var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+    var content = new StringContent(jsonbody, Encoding.UTF8, "application/json");
 
-    var response = await http.PostAsync("https://router.huggingface.co/featherless-ai/v1/completions", content);
+    var response = await http.PostAsync("https://router.huggingface.co/v1/chat/completions", content);
     var json = await response.Content.ReadAsStringAsync();
 
     if (!response.IsSuccessStatusCode)

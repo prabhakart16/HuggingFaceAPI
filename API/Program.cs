@@ -57,5 +57,16 @@ app.MapPost("api/ask", async (HuggingFaceRequest request, IHttpClientFactory fac
 
     return Results.Content(json, "application/json");
 });
+app.MapGet("api/models", () =>
+{
+    var models = new[]
+    {
+        new { id = "google/gemma-2-9b", name = "Google Gemma 2 9B Instruct", provider = "Hugging Face" },
+        new { id = "deepset/roberta-base-squad2", name = "RoBERTa Base SQuAD2", provider = "Hugging Face" },
+        new { id = "gpt2", name = "GPT-2", provider = "Hugging Face" },
+        new { id = "mistralai/Mistral-7B-Instruct-v0.2", name = "Mistral 7B Instruct", provider = "Hugging Face" }
+    };
 
+    return Results.Ok(new { models });
+});
 app.Run();
